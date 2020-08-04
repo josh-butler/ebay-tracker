@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  ebay-tracker
+
+Globals:
+  Function:
+    Runtime: nodejs12.x
+    MemorySize: 128
+    Timeout: 60
+
+Resources:
+  SrcBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-src-bucket
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  ListingExporter:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/listing-exporter.handler
+      Policies:
+        S3WritePolicy:
+          BucketName: !Sub ${AWS::StackName}-src-bucket
+
+  ListingLoader:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handlers/listing-loader.handler
+      Policies:
+        S3ReadPolicy:
+          BucketName: !Sub ${AWS::StackName}-src-bucket
+      Events:
+        S3NewObjectEvent:
+          Type: S3
+          Properties:
+            Bucket: !Ref SrcBucket
+            Events: s3:ObjectCreated:*

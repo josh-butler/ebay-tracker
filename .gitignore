@@ -1,0 +1,9 @@
+.aws-sam
+node_modules
+
+# local dev
+coverage
+Makefile.env
+
+# SAM
+env.json
