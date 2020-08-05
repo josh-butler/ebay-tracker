@@ -281,6 +281,7 @@ Resources:
             install:
               runtime-versions:
                 nodejs: 12
+                python: 3.8
               commands:
                 - echo INSTALL phase started `date`
                 - make install

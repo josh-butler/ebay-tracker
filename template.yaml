@@ -50,6 +50,12 @@ Resources:
       Policies:
         S3WritePolicy:
           BucketName: !Sub ${AWS::StackName}-src-bucket
+      Events:
+        ETLSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(60 minutes)
+            Enabled: True
 
   ListingLoader:
     Type: AWS::Serverless::Function

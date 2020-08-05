@@ -67,8 +67,6 @@ sam-deploy:
 	$(DEPLOY_PARAMS) $(AWS_OPTIONS)
 
 install: npmi # Optional rule intended for use in the CICD environment
-	apt-get update -y
-	pip install --upgrade pip
 	pip install aws-sam-cli
 	@echo INSTALL phase completed `date`
 

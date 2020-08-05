@@ -3,6 +3,12 @@
 AWS SAM based microservice that pulls ebay listing data on a CRON schedule. Listing data
 is then evaluated and stored in DynamoDB.
 
+## Features
+* Process invoked automatically every x minutes via a CloudWatch scheduled event
+* Source data is preserved in a private encrypted S3 bucket
+* Failed ETL jobs are sent to a dead letter SQS queue for inspection or retries
+* App updates are automatically tested and deployed upon GitHub PR merge
+
 
 ![ebay tracker flow](./docs/ebay-tracker-infra.png)
 
@@ -77,7 +83,7 @@ make test
 | Folder        | Purpose       |
 | ------------- |:-------------:|
 |/src | Source code |
-|/__tests__ | Test related files |
+|/tests | Test related files |
 |/template.yaml | SAM CloudFormation Template |
 |/pipeline.yaml | CICD CloudFormation Template |
 |/Makefile | executes local dev & CICD commands |
