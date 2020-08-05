@@ -1,6 +1,46 @@
 const AWS = require('aws-sdk');
+const axios = require('axios');
+const { v4: uuid } = require('uuid');
 
 const s3 = new AWS.S3();
+
+const bucket = 'scinewave';
+const prefix = 'etl';
+const apiURL = 'https://swapi.dev/api';
+
+const getData = async url => {
+  let res;
+  let err;
+  try {
+    res = await axios.get(url);
+  } catch (e) {
+    err = e;
+  }
+  return { res, err };
+};
+
+const putObj = async params => {
+  let err;
+  try {
+    await s3.putObject(params).promise();
+  } catch (e) { err = e; }
+  return err;
+};
+
+const s3Put = async data => {
+  const params = {
+    Bucket: bucket,
+    Key: `${prefix}/${uuid()}.json`,
+    Body: JSON.stringify(data),
+    ContentType: 'application/json',
+  };
+  return putObj(params);
+};
+
+const returnErr = (err, msg) => {
+  console.error(err);
+  throw new Error(msg);
+};
 
 /**
  * Lambda function that fetches data from an external API &
@@ -8,19 +48,16 @@ const s3 = new AWS.S3();
  */
 // eslint-disable-next-line no-unused-vars
 exports.handler = async (event, context) => {
-  const getObjectRequests = event.Records.map(record => {
-    const params = {
-      Bucket: record.s3.bucket.name,
-      Key: record.s3.object.key,
-    };
-    return s3.getObject(params).promise().then(data => {
-      console.info(data.Body.toString());
-    }).catch(err => {
-      console.error('Error calling S3 getObject:', err);
-      return Promise.reject(err);
-    });
-  });
-  return Promise.all(getObjectRequests).then(() => {
-    console.debug('Complete!');
-  });
+  const url = `${apiURL}/people/1`;
+
+  const { res, err } = await getData(url);
+  if (!err) {
+    const { data = {} } = res;
+    const s3Err = await s3Put(data);
+    if (s3Err) {
+      returnErr(s3Err, 'S3 put failed');
+    }
+  } else {
+    returnErr(err.toJSON(), 'API request failed');
+  }
 };

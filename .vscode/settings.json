@@ -1,0 +1,20 @@
+{
+  "editor.formatOnSave": true,
+  "[javascript]": {
+    "editor.formatOnSave": false,
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": false
+  },
+  "[typescript]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": false
+  },
+  "recommendations": ["dbaeumer.vscode-eslint", "editorconfig.editorconfig"],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  }
+}
