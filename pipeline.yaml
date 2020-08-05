@@ -158,6 +158,8 @@ Resources:
               - cloudwatch:*
               - dynamodb:*
               - sqs:*
+              - events:*
+              - s3:*
             Resource: '*'
       Roles:
         - Ref: CodeBuildServiceRole
