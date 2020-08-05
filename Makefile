@@ -12,7 +12,7 @@ BIN:=$(ROOT_PATH)/node_modules/.bin
 ESLINT=$(BIN)/eslint
 JEST=$(BIN)/jest
 
-SAM_ARTIFACT_BUCKET?=lambdadeploys
+APP_BUCKET?=lambdadeploys
 AWS_REGION?=us-east-1
 AWS_OPTIONS=
 
@@ -55,14 +55,14 @@ sam-build:
 sam-package:
 	cd $(BUILD_PATH) && sam package \
 	--template-file template.yaml \
-	--s3-bucket $(SAM_ARTIFACT_BUCKET) \
+	--s3-bucket $(APP_BUCKET) \
 	--output-template-file packaged.yaml \
 	$(AWS_OPTIONS)
 
 sam-deploy: 
 	cd $(BUILD_PATH) && sam deploy \
 	--template-file packaged.yaml \
-	--stack-name $(SAM_STACK_NAME) \
+	--stack-name $(APP_STACK_NAME) \
 	--capabilities CAPABILITY_NAMED_IAM \
 	$(DEPLOY_PARAMS) $(AWS_OPTIONS)
 
