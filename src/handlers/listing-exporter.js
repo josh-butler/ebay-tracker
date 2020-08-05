@@ -46,8 +46,7 @@ const returnErr = (err, msg) => {
  * Lambda function that fetches data from an external API &
  * uploads it to S3
  */
-// eslint-disable-next-line no-unused-vars
-exports.handler = async (event, context) => {
+exports.handler = async () => {
   const url = `${apiURL}/people/1`;
 
   const { res, err } = await getData(url);
