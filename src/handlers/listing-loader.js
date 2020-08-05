@@ -1,12 +1,12 @@
 const AWS = require('aws-sdk');
 
-const s3 = new AWS.S3();
+const S3 = new AWS.S3();
 
 const getObj = async params => {
   let err;
   let data;
   try {
-    data = await s3.getObject(params).promise();
+    data = await S3.getObject(params).promise();
   } catch (e) { err = e; }
   return { data, err };
 };
@@ -20,18 +20,17 @@ const process = async params => {
   return Promise.reject(err);
 };
 
+const s3Params = ({ s3 }) => {
+  const { bucket: { name: Bucket }, object: { key: Key } } = s3;
+  return { Bucket, Key };
+};
+
 /**
  * Lambda function that fetches the S3 object associated with
  * the incoming event. S3 data is then validated & persisted in DDB
  */
 exports.handler = async event => {
-  const getObjectRequests = event.Records.map(record => {
-    const params = {
-      Bucket: record.s3.bucket.name,
-      Key: record.s3.object.key,
-    };
-    return process(params);
-  });
+  const getObjectRequests = event.Records.map(rec => process(s3Params(rec)));
   return Promise.all(getObjectRequests).then(() => {
     console.debug('Complete!');
   });
