@@ -157,6 +157,7 @@ Resources:
               - iam:*
               - cloudwatch:*
               - dynamodb:*
+              - sqs:*
             Resource: '*'
       Roles:
         - Ref: CodeBuildServiceRole

@@ -1,5 +1,5 @@
 .PHONY: all \
-coverage unit invoke \
+test coverage unit invoke \
 sam-build sam-deploy sam-package \
 install pre-build build post-build \
 
@@ -66,7 +66,7 @@ sam-deploy:
 	--template-file packaged.yaml \
 	--stack-name $(APP_NAME)-$(APP_ENVIRONMENT) \
 	--capabilities CAPABILITY_NAMED_IAM \
-	$(DEPLOY_PARAMS) $(AWS_OPTIONS)
+	$(AWS_OPTIONS)
 
 install: npmi # Optional rule intended for use in the CICD environment
 	pip install aws-sam-cli
