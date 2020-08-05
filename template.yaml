@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   ebay-tracker
@@ -10,6 +10,21 @@ Globals:
     Timeout: 60
 
 Resources:
+  ListingTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+
   SrcBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -28,6 +43,10 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: src/handlers/listing-exporter.handler
+      Environment:
+        Variables:
+          BUCKET_NAME: !Sub ${AWS::StackName}-src-bucket
+          API_URL: "https://swapi.dev/api"
       Policies:
         S3WritePolicy:
           BucketName: !Sub ${AWS::StackName}-src-bucket
@@ -36,9 +55,18 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: src/handlers/listing-loader.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ListingTable
       Policies:
-        S3ReadPolicy:
-          BucketName: !Sub ${AWS::StackName}-src-bucket
+        - S3ReadPolicy:
+            BucketName: !Sub ${AWS::StackName}-src-bucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ListingTable
+      EventInvokeConfig:
+        DestinationConfig:
+          OnFailure:
+            Type: SQS
       Events:
         S3NewObjectEvent:
           Type: S3

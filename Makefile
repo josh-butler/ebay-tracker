@@ -1,5 +1,5 @@
 .PHONY: all \
-test unit invoke \
+coverage unit invoke \
 sam-build sam-deploy sam-package \
 install pre-build build post-build \
 
@@ -20,7 +20,7 @@ ifdef AWS_PROFILE
 AWS_OPTIONS=--profile $(AWS_PROFILE)
 endif
 
-all: lint coverage
+test: lint coverage ## Run code linter, unit tests and code coverage report
 
 help: ## Describe all available commands
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -47,6 +47,8 @@ coverage: ## Run unit tests & coverage report
 invoke: ## Invoke individual Lambda
 	sam local invoke $(LAMBDA_NAME) --event $(LAMBDA_EVENT) --env-vars env.json $(AWS_OPTIONS)
 
+deploy: sam-build sam-package sam-deploy ## Deploy SAM app using local code
+
 sam-build:
 	sam build
 
@@ -63,3 +65,18 @@ sam-deploy:
 	--stack-name $(SAM_STACK_NAME) \
 	--capabilities CAPABILITY_NAMED_IAM \
 	$(DEPLOY_PARAMS) $(AWS_OPTIONS)
+
+install: npmi # Optional rule intended for use in the CICD environment
+	apt-get update -y
+	pip install --upgrade pip
+	pip install aws-sam-cli
+	@echo INSTALL phase completed `date`
+
+pre-build: test # Optional rule intended for use in the CICD environment
+	@echo PRE_BUILD phase completed `date`
+
+build: deploy # Optional rule intended for use in the CICD environment
+	@echo BUILD phase completed `date`
+
+post-build: # Optional rule intended for use in the CICD environment
+	@echo POST_BUILD phase completed `date`

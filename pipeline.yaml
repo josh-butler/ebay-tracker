@@ -1,0 +1,368 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Create a CodePipeline and CodeBuild project for a SAM app
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Environment stage (eg. dev, prod)
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+
+  DeployPullRequests:
+    Type: String
+    Description: Should Pull Requests test & deploy a branch stack
+    Default: false
+    AllowedValues:
+      - true
+      - false
+
+  CodeBuildImage:
+    Type: String
+    Description: CodeBuild Docker image to use for test & deploy
+    Default: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+
+  GitHubRepo:
+    Type: String
+    Description: Source GitHub repository name
+
+  GitHubOwner:
+    Type: String
+    Description: GitHub username for CI/CD purposes
+    Default: josh-butler
+
+  GitHubToken:
+    Type: String
+    Description: GitHub access token
+    NoEcho: true
+
+Conditions:
+  PR: !Equals [ !Ref DeployPullRequests, true ]
+
+Mappings:
+  EnvToGit:
+    dev:
+      BRANCH: dev
+      REGEX: ^refs/heads/dev$
+    prod:
+      BRANCH: master
+      REGEX: ^refs/heads/master$
+
+Resources:
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-cpl-service
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketVersioning
+                Resource:
+                  - !Sub arn:aws:s3:::${ArtifactStoreBucket}/*
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:UpdateStack
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:SetStackPolicy
+                  - cloudformation:ValidateTemplate
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: '*'
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+
+  CodeBuildServiceRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CodeBuildServiceRoleDefaultPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:CreateLogGroup
+              - logs:DeleteLogGroup
+              - logs:DeleteLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+              - logs:PutRetentionPolicy                                                                           
+            Resource:
+              - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:GetObjectVersion
+            Resource:
+              - !Sub arn:aws:s3:::${ArtifactStoreBucket}/*
+          - Effect: Allow
+            Action:
+              - s3:DeleteObject
+              - s3:DeleteObjectVersion
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:PutObject
+              - s3:ListBucket
+              - s3:ListBucketVersions
+              - s3:GetBucketLocation
+            Resource:
+              - !Sub arn:aws:s3:::${AppArtifactBucket}
+              - !Sub arn:aws:s3:::${AppArtifactBucket}/*
+          - Effect: Allow
+            Action:
+              - cloudformation:*
+              - lambda:*
+              - apigateway:*
+              - codedeploy:*
+              - iam:*
+              - cloudwatch:*
+              - dynamodb:*
+            Resource: '*'
+      Roles:
+        - Ref: CodeBuildServiceRole
+
+  CloudFormationServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-cf-service
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:DeleteBucket*
+                  - s3:GetBucket*
+                  - s3:PutBucket*
+                  - s3:ListBucket*
+                Resource: '*'
+
+  ArtifactStoreBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: 
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  AppArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: 
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  CodeBuildProjectPR:
+    Type: AWS::CodeBuild::Project
+    Condition: PR
+    Properties:
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Source:
+        Type: GITHUB
+        ReportBuildStatus: true
+        Location: !Sub "https://github.com/${GitHubOwner}/${GitHubRepo}.git"
+        Auth:
+          Type: OAUTH
+          Resource: !Ref GitHubToken
+        GitCloneDepth: 1
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 12
+              commands:
+                - echo INSTALL phase started `date`
+                - make install
+            pre_build:
+              commands:
+                - echo PRE_BUILD phase started `date`
+                - make pre-build
+            build:
+              commands:
+                - echo BUILD phase started `date`
+                - make build
+            post_build:
+              commands:
+                - echo POST_BUILD phase started `date`
+                - make post-build
+      Triggers:
+        Webhook: true
+        FilterGroups:
+          - - Type: EVENT
+              Pattern: PULL_REQUEST_CREATED,PULL_REQUEST_UPDATED
+            - Type: BASE_REF
+              Pattern: !FindInMap [ EnvToGit, !Ref Environment, REGEX ]
+              ExcludeMatchedPattern: false
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Ref CodeBuildImage
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: PULL_REQUEST
+            Value: 'true'
+          - Name: APP_BUCKET
+            Value: !Ref AppArtifactBucket
+          - Name: APP_ENVIRONMENT
+            Value: !Ref Environment
+      ServiceRole: !Ref CodeBuildServiceRole
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 12
+              commands:
+                - echo INSTALL phase started `date`
+                - make install
+            pre_build:
+              commands:
+                - echo PRE_BUILD phase started `date`
+                - make pre-build
+            build:
+              commands:
+                - echo BUILD phase started `date`
+                - make build
+            post_build:
+              commands:
+                - echo POST_BUILD phase started `date`
+                - make post-build
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Ref CodeBuildImage
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: APP_BUCKET
+            Value: !Ref AppArtifactBucket
+          - Name: APP_ENVIRONMENT
+            Value: !Ref Environment
+      ServiceRole: !Ref CodeBuildServiceRole
+
+  PipelineWebhook:
+    Type: AWS::CodePipeline::Webhook
+    Properties:
+      Authentication: GITHUB_HMAC
+      AuthenticationConfiguration:
+        SecretToken: !Ref GitHubToken
+      Filters:
+        - JsonPath: $.ref
+          MatchEquals: 'refs/heads/{Branch}'
+      TargetPipeline: !Ref CFPipeline
+      TargetAction: SourceAction
+      TargetPipelineVersion: !GetAtt CFPipeline.Version
+      RegisterWithThirdParty: true
+
+  CFPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: '1'
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: SourceOutput
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref GitHubRepo
+                Branch: !FindInMap [ EnvToGit, !Ref Environment, BRANCH ]
+                OAuthToken: !Ref GitHubToken
+                PollForSourceChanges: false
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: '1'
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactStoreBucket
+
+Outputs:
+  ArtifactStoreBucket:
+    Value: !Ref ArtifactStoreBucket
+
+  AppArtifactBucket:
+    Value: !Ref AppArtifactBucket

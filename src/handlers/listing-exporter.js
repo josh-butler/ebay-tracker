@@ -4,9 +4,9 @@ const { v4: uuid } = require('uuid');
 
 const s3 = new AWS.S3();
 
-const bucket = 'scinewave';
+const Bucket = process.env.BUCKET_NAME;
 const prefix = 'etl';
-const apiURL = 'https://swapi.dev/api';
+const apiURL = process.env.API_URL;
 
 const getData = async url => {
   let res;
@@ -29,10 +29,11 @@ const putObj = async params => {
 
 const s3Put = async data => {
   const params = {
-    Bucket: bucket,
+    Bucket,
     Key: `${prefix}/${uuid()}.json`,
     Body: JSON.stringify(data),
     ContentType: 'application/json',
+    ServerSideEncryption: 'AES256',
   };
   return putObj(params);
 };
