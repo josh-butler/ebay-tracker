@@ -12,7 +12,9 @@ BIN:=$(ROOT_PATH)/node_modules/.bin
 ESLINT=$(BIN)/eslint
 JEST=$(BIN)/jest
 
+APP_NAME?=ebay-tracker
 APP_BUCKET?=lambdadeploys
+APP_ENVIRONMENT?=dev
 AWS_REGION?=us-east-1
 AWS_OPTIONS=
 
@@ -62,7 +64,7 @@ sam-package:
 sam-deploy: 
 	cd $(BUILD_PATH) && sam deploy \
 	--template-file packaged.yaml \
-	--stack-name $(APP_STACK_NAME) \
+	--stack-name $(APP_NAME)-$(APP_ENVIRONMENT) \
 	--capabilities CAPABILITY_NAMED_IAM \
 	$(DEPLOY_PARAMS) $(AWS_OPTIONS)
 
