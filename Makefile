@@ -46,10 +46,13 @@ coverage: ## Run unit tests & coverage report
 	@echo "Running unit tests and coverage..."
 	@$(JEST) --coverage
 
-invoke: ## Invoke individual Lambda
+invoke: sam-clean ## Invoke individual Lambda
 	sam local invoke $(LAMBDA_NAME) --event $(LAMBDA_EVENT) --env-vars env.json $(AWS_OPTIONS)
 
 deploy: sam-build sam-package sam-deploy ## Deploy SAM app using local code
+
+sam-clean: ## Delete local artifacts
+	rm -rf .aws-sam
 
 sam-build:
 	sam build

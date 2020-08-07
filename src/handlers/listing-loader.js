@@ -35,6 +35,21 @@ const parse = body => {
 
 const valid = ({ name }) => name;
 
+/**
+ * Transform data & build DDB put item obj
+ */
+const listingItem = data => {
+  const {
+    gender, height, mass, films: reviews, vehicles = [],
+  } = data;
+  const delta = height - mass;
+  const cnt = vehicles.length;
+  const pk = `LISTING#${gender}`;
+  return {
+    pk, sk: pk, gender, mass, height, cnt, delta, reviews,
+  };
+};
+
 const transfrom = body => {
   let err;
   let item;
@@ -42,9 +57,7 @@ const transfrom = body => {
   if (!parseErr) {
     err = valid(data) ? null : new Error('Invalid source data');
     if (!err) {
-      const pk = 'LISTING';
-      const { name: sk } = data;
-      item = { pk, sk };
+      item = listingItem(data);
     }
   } else {
     err = parseErr;
